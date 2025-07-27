@@ -1,31 +1,25 @@
 import express from 'express';
 import fetch from 'node-fetch';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import cors from 'cors';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS middleware — add this BEFORE your routes
+// Middleware for handling raw body (for license requests)
+app.use(express.raw({ type: '*/*', limit: '10mb' }));
+
+// CORS middleware — place BEFORE routes
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // You can restrict this to your domain
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Replace * with your domain in production
   res.setHeader('Access-Control-Allow-Headers', '*');
   next();
 });
 
-// 🔒 Force HTTPS middleware
-app.use((req, res, next) => {
-  if (req.headers['x-forwarded-proto'] !== 'https') {
-    return res.redirect(`https://${req.headers.host}${req.url}`);
-  }
-  next();
-});
-
-// Your proxy route
-app.get('/api/*', async (req, res) => {
-  const origin = 'http://143.44.136.110:6910';
-  const path = req.params[0]; // everything after /api/
+// MPD and segment proxy
+app.get('/proxy/*', async (req, res) => {
+  const path = req.params[0];
   const query = req.url.split('?')[1] || '';
+  const origin = 'http://143.44.136.110:6910';
   const targetUrl = `${origin}/${path}${query ? `?${query}` : ''}`;
 
   try {
@@ -38,6 +32,29 @@ app.get('/api/*', async (req, res) => {
   }
 });
 
+// Widevine license proxy
+app.post('/license', async (req, res) => {
+  const deviceId = req.query.deviceId || '02:00:00:00:00:00';
+  const licenseUrl = `http://143.44.136.74:9443/widevine/?deviceId=${deviceId}`;
+
+  try {
+    const licenseRes = await fetch(licenseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': req.headers['content-type'],
+      },
+      body: req.body,
+    });
+
+    const licenseBuffer = Buffer.from(await licenseRes.arrayBuffer());
+    res.setHeader('Content-Type', licenseRes.headers.get('content-type') || 'application/octet-stream');
+    res.status(200).send(licenseBuffer);
+  } catch (err) {
+    res.status(500).json({ error: 'License proxy failed', details: err.message });
+  }
+});
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Proxy running on http://localhost:${PORT}`);
 });
