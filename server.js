@@ -1,20 +1,30 @@
-// server.js
 import express from 'express';
 import fetch from 'node-fetch';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/*', async (req, res) => {
+// 🔒 Force HTTPS middleware
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+// Your proxy route
+app.get('/api/*', async (req, res) => {
   const origin = 'http://143.44.136.110:6910';
-  const path = req.path.slice(1); // remove leading /
+  const path = req.params[0]; // everything after /api/
   const query = req.url.split('?')[1] || '';
-  const url = `${origin}/${path}${query ? `?${query}` : ''}`;
+  const targetUrl = `${origin}/${path}${query ? `?${query}` : ''}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(targetUrl);
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
     const buffer = Buffer.from(await response.arrayBuffer());
-    res.set('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
     res.status(200).send(buffer);
   } catch (err) {
     res.status(500).json({ error: 'Proxy failed', details: err.message });
@@ -22,5 +32,5 @@ app.get('/*', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Proxy server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
