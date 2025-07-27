@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 });
 
 // MPD and segment proxy
-app.get('/proxy/*', async (req, res) => {
+app.get('/api/*', async (req, res) => {
   const path = req.params[0];
   const origin = 'http://143.44.136.110:6910';
   const targetUrl = `${origin}/${path}?virtualDomain=001.live_hls.zte.com`;
