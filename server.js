@@ -10,8 +10,9 @@ app.use(express.raw({ type: '*/*', limit: '10mb' }));
 
 // CORS middleware — place BEFORE routes
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Replace * with your domain in production
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   next();
 });
 
@@ -34,25 +35,24 @@ app.get('/proxy/*', async (req, res) => {
 
 // Widevine license proxy
 app.post('/license', async (req, res) => {
-  const deviceId = req.query.deviceId || '02:00:00:00:00:00';
-  const licenseUrl = `http://143.44.136.74:9443/widevine/?deviceId=${deviceId}`;
-
   try {
-    const licenseRes = await fetch(licenseUrl, {
+    const licenseServer = `http://143.44.136.74:9443/widevine/?${new URLSearchParams(req.query)}`;
+
+    const response = await fetch(licenseServer, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers['content-type'],
       },
-      body: req.body,
+      body: req,
     });
 
-    const licenseBuffer = Buffer.from(await licenseRes.arrayBuffer());
-    res.setHeader('Content-Type', licenseRes.headers.get('content-type') || 'application/octet-stream');
-    res.status(200).send(licenseBuffer);
+    res.status(response.status);
+    response.body.pipe(res); // Forward raw binary response
   } catch (err) {
-    res.status(500).json({ error: 'License proxy failed', details: err.message });
+    res.status(500).json({ error: 'License proxy failed', message: err.message });
   }
 });
+
 
 // Start server
 app.listen(PORT, () => {
