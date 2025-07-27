@@ -6,6 +6,13 @@ import { dirname } from 'path';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS middleware — add this BEFORE your routes
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // You can restrict this to your domain
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  next();
+});
+
 // 🔒 Force HTTPS middleware
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] !== 'https') {
